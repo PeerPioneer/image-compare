@@ -28,6 +28,7 @@ class Compare {
 
         this.visualisation_select = document.getElementById('visualisation_select');
         this.transform_select = document.getElementById('transform_select')
+        this.downscale_option = document.getElementById('skip_downscale_checkbox').closest('.mdc-tab');
         this.current_transform = 'affine';
 
         this.back_btn = document.getElementById('back');
@@ -152,15 +153,16 @@ class Compare {
 
     show_compare_screen () {
         var li = this.more_menu_el.querySelectorAll('.mdc-deprecated-list-item');
-        for(var i=0; i<2; ++i) {
+        for(var i=0; i<3; ++i) {
             li[i].classList.add('mdc-deprecated-list-item--disabled');
         }
 
         this.transform_select.classList.remove('hide');
+        this.downscale_option.classList.remove('hide');
 
         this.visualisation_select.classList.add('hide');
-        this.visualisation_select.MDCSelect.setValue('toggle');
-        this.visualisation_select.querySelector('#selected-text').textContent = 'Toggle';
+        this.visualisation_select.MDCSelect.setValue('diff');
+        this.visualisation_select.querySelector('#selected-text').textContent = 'Difference';
 
         this.cc.scrollIntoView({behavior: 'smooth', inline: 'start'});
         window.requestAnimationFrame(() => {
@@ -173,6 +175,7 @@ class Compare {
         this.visualisation_select.classList.remove('hide');
 
         this.transform_select.classList.add('hide');
+        this.downscale_option.classList.add('hide');
 
         this.action_bar.show();
         this.cc.scrollIntoView({behavior: 'smooth', inline: 'end'})

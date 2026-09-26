@@ -1,4 +1,4 @@
-const MAX_DIM = 1024;
+let MAX_DIM = 1024; // can be changed to Infinity via the "Full resolution" checkbox
 
 const COLOR_CHANNELS = {
     red: "#F00",

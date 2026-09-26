@@ -20,7 +20,7 @@ class Action {
         this.result = result;
 
         // TODO: Infer from document or set the document
-        this._MODE = 'toggle';
+        this._MODE = 'diff';
         this._TOGGLE_SPEED = 2;
         this._OVERLAY = 0.5;
         this._SLIDE = 0.5;
@@ -43,10 +43,13 @@ class Action {
         this.hover_add = hover_add;
         this.hover_remove = hover_remove;
 
+        // NOTE: the old magnifier-lens zoom (activated by mouse wheel) has been
+        // replaced by simple zoom in/out buttons - see the zoom_in/zoom_out/zoom_reset
+        // wiring near the bottom of index.html. handle_zoom() is kept below but no
+        // longer attached, so the magnifier lens no longer appears.
         const { add_listeners: add_zoom_listener, remove_listeners: remove_zoom_listener } = this.handle_zoom();
         this.add_zoom_listener = add_zoom_listener;
         this.remove_zoom_listener = remove_zoom_listener;
-        this.add_zoom_listener();
 
         this.more_menu_el = document.getElementById('more_menu');
         this.info_dialog_el = document.getElementById('info-dialog');
@@ -60,6 +63,9 @@ class Action {
                 break;
             case 'export_toggle':
                 this.export_gif();
+                break;
+            case 'export_diff_image':
+                this.export_current_view();
                 break;
             case 'licenses':
                 this.download_el.href = 'licenses.txt';
@@ -90,11 +96,8 @@ class Action {
             });
         }
         if(val === 'slide') {
-            this.remove_zoom_listener();
-
             this.image_slider.classList.remove('hide');
         } else {
-            this.add_zoom_listener();
             this.image_slider.classList.add('hide');
         }
 
@@ -191,7 +194,7 @@ class Action {
     }
     reset () {
         // Reset state
-        this._MODE = 'toggle';
+        this._MODE = 'diff';
         this._TOGGLE_SPEED = 2;
         this._OVERLAY = 0.5;
         this._SLIDE = 0.5;
@@ -232,9 +235,18 @@ class Action {
             return;
         }
         e.stopPropagation();
+        this.export_current_view();
+    }
+
+    export_current_view() {
+        // Exports whatever is currently shown in the main result canvas
+        // (e.g. the Difference view). Used both by the "Download" button
+        // shown in Difference mode and by the "Export" menu item.
         this.download_el.href = this.result.canvas.toDataURL("image/png");
         this.download_el.download = "image_compare_visualisation.png";
         this.download_el.click();
+        this.snack_el.MDCSnackbar.labelText = 'Saved current view as image.';
+        this.snack_el.MDCSnackbar.open();
     }
 
     handle_slide(e) {
