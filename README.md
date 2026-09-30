@@ -1,3 +1,10 @@
+# Book Compare
+Do you work with books? Do you want to compare them? Boy, do I have good news for you. Use Book Compare to compare books.
+Book compare is based on Image Compare but has a few added features and modifications that makes it more suitable for comparing entire books with each other.
+This is still very much a work in progress.
+
+
+
 # Image Compare
 Image Compare is a lightweight, standalone and offline application to visually compare two images and highlight their differences. This application can be used in desktop computers and mobile phones without requiring installation as it runs entires in a web browser. Image Compare is an open source software developed and maintained by the [VGG Oxford](https://www.robots.ox.ac.uk/~vgg/).
 
