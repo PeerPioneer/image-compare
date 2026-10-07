@@ -12,7 +12,9 @@ class Action {
             return _r;
         }, {});
 
-        this.overlay_slider = this.el['overlay'].querySelector('.mdc-slider');
+        // Hover and Overlay are removed from the UI for now, but kept dormant
+        // here in case they come back - guard every use of overlay_slider.
+        this.overlay_slider = this.el['overlay'] ? this.el['overlay'].querySelector('.mdc-slider') : null;
         this.result_container = document.getElementById('result');
         //this.result_parent = this.result_container.parentElement
         this.image_slider = this.result_container.querySelector('.image_slider');
@@ -31,10 +33,15 @@ class Action {
 
         this.el['toggle'].onclick = this.handle_toggle.bind(this);
         this.el['slide'].onchange = this.handle_slide.bind(this);
-        this.el['diff'].onclick = this.handle_diff.bind(this);
+        // Difference mode's Download button is gone (the "Export Current
+        // View" item in the "More" menu already covers it) - #diff now just
+        // holds the "Red = image 1 / Cyan = Image 2" note, so it no longer
+        // needs a click handler.
 
         this.hover_text = document.getElementById('hover-image');
-        this.overlay_slider.addEventListener('MDCSlider:input', this.handle_overlay.bind(this));
+        if (this.overlay_slider) {
+            this.overlay_slider.addEventListener('MDCSlider:input', this.handle_overlay.bind(this));
+        }
 
         this.draw = this._draw.bind(this);
         this.updating = false;
@@ -110,6 +117,7 @@ class Action {
             this.hover_remove();
         }
         this._MODE = val;
+        document.dispatchEvent(new CustomEvent('modechange', { detail: val }));
         this.show();
     }
 
@@ -175,6 +183,15 @@ class Action {
                 this.hover_text.textContent = this.HOVER;
                 this.result.draw_toggle_image(this.HOVER === '2');
                 break;
+            case 'topbottom':
+            case 'leftright':
+            case 'onlyimage1':
+            case 'onlyimage2':
+                // Nothing to draw here - none of these four modes merge the
+                // images, they just show the "Copy 1" / "Copy 2, aligned"
+                // panel(s) full-size instead of the merged-picture panel
+                // (see the 'modechange' handling in panes.js).
+                break;
             default:
                 this.result.draw_diff_image();
                 throw new Error('Unknown mode', this.MODE);
@@ -220,9 +237,10 @@ class Action {
         this.image_slider.style.left = '50%';
         this.image_slider.style.top = '50%';
 
-        // Reset overlay ui
-        this.overlay_slider.MDCSlider.value =
-            Math.round(this._OVERLAY * 100);
+        // Reset overlay ui (if present - Overlay mode is currently removed)
+        if (this.overlay_slider) {
+            this.overlay_slider.MDCSlider.value = Math.round(this._OVERLAY * 100);
+        }
 
         // Reset hover ui
 

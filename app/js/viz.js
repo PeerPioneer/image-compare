@@ -1,9 +1,42 @@
-let MAX_DIM = 1024; // can be changed to Infinity via the "Full resolution" checkbox
+const MAX_DIM = Infinity; // always compare at full resolution - no downscaling
+let BW_ENABLED_1 = false; // set from image 1's "Black & white" checkbox before Compare is clicked
+let BW_ENABLED_2 = false; // set from image 2's "Black & white" checkbox before Compare is clicked
+let CONTRAST_PERCENT_1 = 100; // contrast of the first scan, from its slider; 100 = no change
+let CONTRAST_PERCENT_2 = 100; // contrast of the second scan, from its slider
+
+// Applies the black & white / contrast settings to a raw ImageData object.
+// Called once per image, inside process(), before the alignment/warp step,
+// so both the matching computation and every visualisation mode
+// (Difference, Toggle, Overlay, ...) see the same treated pixels.
+const apply_bw_contrast = (imageData, bwEnabled, contrastPercent) => {
+    if (!bwEnabled && contrastPercent === 100) {
+        return imageData;
+    }
+    const data = imageData.data;
+    const contrastFactor = contrastPercent / 100;
+    for (let i = 0; i < data.length; i += 4) {
+        let r = data[i], g = data[i + 1], b = data[i + 2];
+        if (bwEnabled) {
+            const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b; // same weights as the on-screen preview filter
+            r = g = b = gray;
+        }
+        data[i]     = (r - 127.5) * contrastFactor + 127.5;
+        data[i + 1] = (g - 127.5) * contrastFactor + 127.5;
+        data[i + 2] = (b - 127.5) * contrastFactor + 127.5;
+    }
+    return imageData;
+};
 
 const COLOR_CHANNELS = {
     red: "#F00",
     green: "#0F0",
     blue: "#00F",
+    // Difference mode blends this with red using additive ("lighter")
+    // blending - see draw_diff_image() below. For a spot that's blank/white
+    // in both images to come out white (not tinted), this color plus red
+    // must add up to exactly white: red (255,0,0) + this must equal
+    // (255,255,255), which only works for full-strength cyan (0,255,255).
+    // A duller shade like teal breaks that and tints the whole background.
     bg: "#0FF",
     rg: "#FF0",
     rb: "#F0F",
@@ -102,6 +135,21 @@ class Visualization {
         // Temporary canvas to use for computing diff
         this.dcanvas = document.createElement('canvas');
 
+        // Holds image 1 after black & white / contrast treatment is applied,
+        // so every visualisation mode (not just the alignment computation)
+        // shows the same treated version of image 1 that image 2 gets
+        // automatically via the warp step in process().
+        this.ocanvas = document.createElement('canvas');
+        this.octx = this.ocanvas.getContext('2d');
+
+        // Hold the untreated, "Original" versions of image 1 and (aligned)
+        // image 2, for the "Only image 1" / "Only image 2" modes' switch
+        // between "User-adjusted" and "Original".
+        this.rcanvas1 = document.createElement('canvas');
+        this.rctx1 = this.rcanvas1.getContext('2d');
+        this.rcanvas2 = document.createElement('canvas');
+        this.rctx2 = this.rcanvas2.getContext('2d');
+
         this.bcanvas.width = this.tcanvas.width = this.dcanvas.width = this.canvas.width;
         this.bcanvas.height = this.tcanvas.height = this.dcanvas.height = this.canvas.height;
 
@@ -172,10 +220,35 @@ class Visualization {
     }
 
     process(img1, img2, transform) {
-        this.input_image = img1;
+        let im1Data = this.getImageData(img1);
+        let im2Data = this.getImageData(img2);
 
-        const im1Data = this.getImageData(img1);
-        const im2Data = this.getImageData(img2);
+        // Keep untouched copies of both, for the "Original" option on the
+        // "Only image 1" / "Only image 2" modes - apply_bw_contrast mutates
+        // its argument in place, so these have to be cloned first.
+        const raw_im1 = new ImageData(
+            new Uint8ClampedArray(im1Data.data), im1Data.width, im1Data.height
+        );
+        const raw_im2 = new ImageData(
+            new Uint8ClampedArray(im2Data.data), im2Data.width, im2Data.height
+        );
+
+        im1Data = apply_bw_contrast(im1Data, BW_ENABLED_1, CONTRAST_PERCENT_1);
+        im2Data = apply_bw_contrast(im2Data, BW_ENABLED_2, CONTRAST_PERCENT_2);
+
+        // Store the treated version of image 1 and use it as input_image from
+        // now on, so Toggle/Difference/etc. all show the same black & white
+        // / contrast treatment that image 2 gets automatically via warp_image.
+        this.ocanvas.width = im1Data.width;
+        this.ocanvas.height = im1Data.height;
+        this.octx.putImageData(im1Data, 0, 0);
+        this.input_image = this.ocanvas;
+
+        // The untreated, original image 1 needs no alignment - it's the
+        // reference image everything else is aligned to.
+        this.rcanvas1.width = raw_im1.width;
+        this.rcanvas1.height = raw_im1.height;
+        this.rctx1.putImageData(raw_im1, 0, 0);
 
         const buf = this.transform.estimate_transform(
             im2Data.data,
@@ -210,6 +283,24 @@ class Visualization {
         this.tcanvas.height = this.bcanvas.height = this.canvas.height = im1Data.height;
         this.tctx.putImageData(this.resultData, 0, 0);
 
+        // Also warp the untreated, original image 2 using the exact same
+        // transform H, so "Only image 2: Original" still lines up - just
+        // without the black & white / contrast treatment.
+        const _raw_warped_buf = this.transform.warp_image(
+            raw_im2.data,
+            raw_im2.height,
+            H,
+            im1Data.height,
+            im1Data.width,
+            transform,
+        );
+        this.rcanvas2.width = im1Data.width;
+        this.rcanvas2.height = im1Data.height;
+        this.rctx2.putImageData(
+            new ImageData(new Uint8ClampedArray(_raw_warped_buf), im1Data.width, im1Data.height),
+            0, 0
+        );
+
         this.canvas.dispatchEvent(new CustomEvent('transform', {
             bubbles: true,
         }));
@@ -222,8 +313,8 @@ class Visualization {
     getImageData (img) {
         const { width: cw, height: ch } = this.bcanvas;
         this.bctx.clearRect(0, 0, cw, ch);
-        const iw = img.naturalWidth,
-            ih = img.naturalHeight;
+        const iw = img.naturalWidth || img.width,
+            ih = img.naturalHeight || img.height;
 
         if (iw < MAX_DIM && ih < MAX_DIM) {
             this.bcanvas.width = iw;
@@ -368,26 +459,31 @@ class Visualization {
 
         const { bctx, dctx, dcanvas, input_image, tcanvas } = this;
 
-        // Copy image
+        // Copy image 1. Tinted teal: a pixel that's dark (inked) in image 1
+        // stays dark regardless of tint, so the tint only shows through
+        // where image 1 is blank - i.e. this layer's colour marks spots
+        // that are unique to image 2 (see the "lighter" blend below).
         copyImage(dctx, input_image);
 
         // gray scale
         grayscale(dctx);
 
         // Get channel
-        multiplyChannel(dctx, "red");
+        multiplyChannel(dctx, "bg");
 
         // Copy it to diff canvas
         this._draw_image(dcanvas, true);
 
-        // copy image2
+        // copy image2, tinted red - by the same logic, this layer's colour
+        // marks spots that are unique to image 1, so after the "lighter"
+        // (additive) blend below: red = image 1, teal = image 2.
         copyImage(dctx, tcanvas);
 
         // grayscale
         grayscale(dctx);
 
-        // multiply blue-green
-        multiplyChannel(dctx, "bg");
+        // multiply red
+        multiplyChannel(dctx, "red");
 
         // Copy it over diff canvas
         bctx.save();

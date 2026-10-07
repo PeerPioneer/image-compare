@@ -30,31 +30,12 @@
     />
 
     <!--
-        Development of Image Compare is supported by the EPSRC programme grant
-        Visual AI: An Open World Interpretable Visual Transformer (UKRI Grant EP/T028572/1)
-        Using Google Analytics, we record the usage of this application.
-        This data is used in reporting of this programme grant.
-
-        If you do not wish to share this data, you can safely remove the
-        javascript code below.
+        The original Image Compare app includes Google Analytics here
+        (the developers' own comment says this can safely be removed if
+        you don't want to share usage data). It has been removed in this
+        modified version so the app never tries to contact the internet,
+        which matters for fully offline use.
       -->
-
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        dataLayer.push(arguments);
-      }
-      gtag("consent", "default", {
-        ad_storage: "denied",
-        analytics_storage: "denied",
-      });
-      gtag("js", new Date());
-      gtag("config", "G-T47X77WPWN", { anonymize_ip: true });
-    </script>
-    <script
-      async
-      src="https://www.googletagmanager.com/gtag/js?id=G-T47X77WPWN"
-    ></script>
 
     <link rel="shortcut icon" href="favicon.ico" />
     <link rel="apple-touch-icon" href="./images/icons/imcomp-192x192.png" />
@@ -65,14 +46,12 @@
       href="./deps/material-components-web.min.css"
       as="style"
       type="text/css"
-      integrity="sha384-zYyxh4r8CWy0xvG1ua+/rTeQmFY/YhmqzzaqluuGnN9+fCFSj/jF1AwiW9p+KUW/"
     />
     <link
       rel="preload"
       href="./deps/material-components-web.min.js"
       as="script"
       type="text/javascript"
-      integrity="sha384-8iww5N0HFABAFdwBAcqef8367heaZqV6cGdI2zjVr6ztCVbINoKlnoyYyCvkEtAt"
     />
     <link
       rel="preload"
@@ -84,7 +63,6 @@
     <link
       rel="stylesheet"
       href="./deps/material-components-web.min.css"
-      integrity="sha384-zYyxh4r8CWy0xvG1ua+/rTeQmFY/YhmqzzaqluuGnN9+fCFSj/jF1AwiW9p+KUW/"
     />
     <script>
       const show_onboarding =
@@ -107,6 +85,12 @@
     </script>
 
     <style>
+      /* This toolkit's purple theme color is driven by this one custom
+         property almost everywhere (buttons, dropdowns, tabs, checkboxes,
+         dialogs...), so overriding it here recolors the app consistently. */
+      :root {
+        --mdc-theme-primary: #008080;
+      }
       * {
         box-sizing: border-box;
       }
@@ -388,7 +372,7 @@
         display: grid;
         min-height: 0;
         max-height: 100%;
-        grid-template-rows: auto minmax(0, 1fr) auto;
+        grid-template-rows: 0 minmax(0, 1fr) auto;
         grid-template-columns: 100vw 100vw;
         z-index: 1;
       }
@@ -416,8 +400,24 @@
         position: relative;
         overflow: hidden;
         cursor: pointer;
+        display: flex;
+        flex-flow: column nowrap;
       }
-      #compare_container > .vertical-image-list > li > span {
+      /* The image now shares its card with the adjustment controls below,
+         so it gets a flexible share of the height instead of all of it. */
+      .image_preview {
+        position: relative;
+        flex: 1 1 0;
+        min-height: 0;
+        display: flex;
+      }
+      .image_preview > img.mdc-image-list__image {
+        height: 100%;
+        max-width: 100%;
+        object-fit: contain;
+        margin: auto;
+      }
+      .image_preview > span {
         position: absolute;
         border-radius: 50%;
         bottom: 0;
@@ -426,9 +426,33 @@
         margin-bottom: 0.25em;
         background-color: #f7f7f7;
       }
+      .image_adjust {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.6em;
+        padding: 0.5em 0.75em;
+        cursor: default;
+      }
+      .image_adjust label {
+        display: flex;
+        align-items: center;
+        gap: 0.3em;
+        white-space: nowrap;
+      }
+      .image_adjust input[type='range'] {
+        width: 90px;
+        vertical-align: middle;
+      }
 
+      /* #action now lives in the purple footer bar, to the right of the
+         Visualization dropdown, instead of its own white bar. Its children
+         (one per mode - toggle/slide/diff/onlyimage1/onlyimage2/the two
+         empty placeholders for topbottom/leftright) stack on top of each
+         other via the grid below; only the current mode's child is ever
+         un-hidden, same mechanism as before, just relocated. */
       #action {
-        grid-area: 3 / 2 / 4 / 3;
         margin: auto;
         display: grid;
         grid-template-columns: auto;
@@ -441,48 +465,350 @@
       #toggle {
         width: auto;
       }
-      #overlay {
-        min-width: 256px;
-        width: 90%;
+      .transform_help_btn {
+        flex: 0 0 auto;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: none;
+        background: #fff;
+        color: var(--mdc-theme-primary, #6200ee);
+        font: inherit;
+        font-weight: 700;
+        font-size: 16px;
+        line-height: 1;
+        cursor: pointer;
+        margin: 0 0.5em;
+        align-self: center;
       }
-      #overlay > span {
-        flex: 0 1 48px;
-        line-height: 0;
-        text-align: center;
+      /* Toggle mode's Slow/Normal/Fast segmented control: reversed from
+         MDC's own defaults by request - the SELECTED segment gets a white
+         background and teal text, the other segments get a teal background
+         and white text, with a thin divider between each segment. The
+         underlying class-toggling logic in action.js is unchanged; this
+         just reinterprets what those classes look like in this one spot. */
+      #toggle .mdc-tab {
+        background-color: var(--mdc-theme-primary, #6200ee) !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.4);
       }
-      #overlay > span > img {
-        max-width: 100%;
-        height: 100%;
-        object-fit: contain;
+      #toggle .mdc-tab:last-child {
+        border-right: none;
       }
-      #overlay > .mdc-slider {
-        flex: 1 0 auto;
+      #toggle .mdc-tab .mdc-tab__text-label.mdc-theme--primary {
+        color: #fff !important;
+      }
+      #toggle .mdc-tab.active.mdc-theme--primary-bg {
+        background-color: #fff !important;
+      }
+      #toggle .mdc-tab.active .mdc-tab__text-label.mdc-theme--on-primary {
+        color: var(--mdc-theme-primary, #6200ee) !important;
+      }
+      .diff_note {
+        line-height: 1.3;
+        white-space: nowrap;
+        text-align: left;
+      }
+      .image_variant_switch {
+        display: flex;
+        border: 1px solid rgba(255, 255, 255, 0.7);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .image_variant_btn {
+        border: 0;
+        background: transparent;
+        color: #fff;
+        padding: 0.3em 0.6em;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .image_variant_btn + .image_variant_btn {
+        border-left: 1px solid rgba(255, 255, 255, 0.7);
+      }
+      .image_variant_btn.active {
+        background: rgba(255, 255, 255, 0.85);
+        color: var(--mdc-theme-primary, #6200ee);
+        font-weight: 500;
       }
 
+      /* row 3 is 0-height now (see #compare_container above) - the button
+         is centred in the "Compare" screen's column (column 1) by taking it
+         out of the grid's height calculation with position:absolute, which
+         also fixes a bug where that empty row was leaking a blank band
+         into column 2 (the result view), since row tracks are shared
+         across both 100vw-wide columns. */
+      /* Reverted from an earlier position:absolute attempt to fix a white
+         bar in the result view - that approach made the button disappear
+         entirely instead, so back to plain grid placement + margin
+         centering (the way this worked in every round before that one).
+         The white-bar issue is still open; worth a safer fix later. */
       #compare {
         grid-area: 3 / 1 / 4 / 2;
         margin: auto auto 1.5em auto;
+        background-color: #fff !important;
+        color: var(--mdc-theme-primary, #6200ee) !important;
+        padding: 0 2em;
+        height: 56px;
+      }
+      #compare .mdc-button__label {
+        font-size: 1.3em;
+        font-weight: 700;
+        letter-spacing: 0.05em;
       }
 
       div.result_container {
         grid-area: 2 / 2;
         position: relative;
         overflow: hidden;
-        display: flex;
-        flex-flow: column nowrap;
+        min-height: 0;
       }
-      #result {
+      /* #workspace has three possible shapes, picked by a class that's
+         switched in panes.js whenever the Visualization mode changes:
+           .ws-three     - the normal view: merged picture | copy 1 / copy 2
+           .ws-stacked   - "Top and bottom": copy 1 over copy 2, full width
+           .ws-sidebyside - "Left and right": copy 1 | copy 2, full height
+         --col1 / --row1 are written by the splitters (in px); each shape's
+         grid-template decides whether it uses them at all. */
+      #workspace {
+        --col1: 55%;
+        --row1: 50%;
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        display: grid;
+        background: #ddd;
+      }
+      #workspace.ws-three {
+        grid-template-columns: var(--col1) 6px minmax(0, 1fr);
+        grid-template-rows: var(--row1) 6px minmax(0, 1fr);
+        grid-template-areas:
+          'main splitv o1'
+          'main splitv splith'
+          'main splitv o2';
+      }
+      #workspace.ws-stacked {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: var(--row1) 6px minmax(0, 1fr);
+        grid-template-areas: 'o1' 'splith' 'o2';
+      }
+      #workspace.ws-sidebyside {
+        grid-template-columns: var(--col1) 6px minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr);
+        grid-template-areas: 'o1 splitv o2';
+      }
+      /* "Only image 1" / "Only image 2": a single full-size panel. */
+      #workspace.ws-single1 {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr);
+        grid-template-areas: 'o1';
+      }
+      #workspace.ws-single2 {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr);
+        grid-template-areas: 'o2';
+      }
+      #workspace.ws-stacked #pane_main,
+      #workspace.ws-stacked #split_v,
+      #workspace.ws-sidebyside #pane_main,
+      #workspace.ws-sidebyside #split_h,
+      #workspace.ws-single1 #pane_main,
+      #workspace.ws-single1 #pane_o2,
+      #workspace.ws-single1 #split_v,
+      #workspace.ws-single1 #split_h,
+      #workspace.ws-single2 #pane_main,
+      #workspace.ws-single2 #pane_o1,
+      #workspace.ws-single2 #split_v,
+      #workspace.ws-single2 #split_h {
+        display: none;
+      }
+      #pane_main {
+        grid-area: main;
+        min-width: 0;
+        min-height: 0;
+      }
+      #pane_o1 {
+        grid-area: o1;
+        min-width: 0;
+        min-height: 0;
+      }
+      #pane_o2 {
+        grid-area: o2;
+        min-width: 0;
+        min-height: 0;
+      }
+      #split_v {
+        grid-area: splitv;
+      }
+      #split_h {
+        grid-area: splith;
+      }
+      .splitter {
+        background: #c4c4c4;
+        z-index: 3;
+      }
+      .splitter--v {
+        cursor: col-resize;
+      }
+      .splitter--h {
+        cursor: row-resize;
+      }
+      .splitter:hover,
+      .splitter.active {
+        background: #8f8f8f;
+      }
+      body.splitting {
+        user-select: none;
+      }
+      .pane {
+        position: relative;
         flex: 1;
+        min-width: 0;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 24px;
+        grid-template-rows: minmax(0, 1fr) 24px;
+        background: #fff;
+      }
+      .pane__vp {
+        grid-area: 1 / 1;
+        min-width: 0;
+        min-height: 0;
+        overflow: scroll;
+        display: flex;
+        background: #f0f0f0;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      .pane__vp::-webkit-scrollbar {
+        display: none;
+      }
+      .pane__content {
+        flex: none;
         margin: auto;
         position: relative;
-        border: 1px black solid;
+      }
+      .pane__content > canvas {
+        display: block;
+        box-sizing: border-box;
+        width: 100%;
         height: 100%;
+        background: #fff;
       }
       #result > canvas {
         padding: 0.25em;
-        width: 100%;
-        height: 100%;
         object-fit: contain;
+      }
+      .pane__vbar {
+        grid-area: 1 / 2;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        background: #f4f4f4;
+        border-left: 1px solid #b5b5b5;
+      }
+      .pane__hbar {
+        grid-area: 2 / 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: row;
+        background: #f4f4f4;
+        border-top: 1px solid #b5b5b5;
+      }
+      .pane__corner {
+        grid-area: 2 / 2;
+        background: #e6e6e6;
+        border-top: 1px solid #b5b5b5;
+        border-left: 1px solid #b5b5b5;
+      }
+      .pane__btn {
+        flex: 0 0 24px;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        margin: 0;
+        border: 0;
+        border-bottom: 1px solid #b5b5b5;
+        background: #fafafa;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .pane__hbar .pane__btn {
+        border-bottom: 0;
+        border-right: 1px solid #b5b5b5;
+      }
+      .pane__hbar .pane__btn:last-child {
+        border-right: 0;
+        border-left: 1px solid #b5b5b5;
+      }
+      .pane__btn:hover:not(:disabled) {
+        background: #e4e4e4;
+      }
+      .pane__btn:disabled {
+        opacity: 0.35;
+        cursor: default;
+      }
+      .pane__btn svg {
+        width: 18px;
+        height: 18px;
+        fill: none;
+        stroke: #777;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .pane__btn svg.fill {
+        fill: #777;
+        stroke: none;
+      }
+      .pane__track {
+        flex: 1 1 0;
+        min-width: 0;
+        min-height: 0;
+        position: relative;
+        background: #fff;
+      }
+      .pane__thumb {
+        position: absolute;
+        display: none;
+        background: #909090;
+        border-radius: 8px;
+      }
+      .pane__vbar .pane__thumb {
+        left: 4px;
+        right: 4px;
+      }
+      .pane__hbar .pane__thumb {
+        top: 4px;
+        bottom: 4px;
+      }
+      .pane__thumb:hover,
+      .pane__thumb.active {
+        background: #6b6b6b;
+      }
+      .pane__label {
+        position: absolute;
+        left: 6px;
+        top: 4px;
+        z-index: 2;
+        max-width: 70%;
+        padding: 1px 6px;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        font-size: 11px;
+        background: rgba(255, 255, 255, 0.85);
+        border-radius: 3px;
+        pointer-events: none;
+      }
+      #contrast_slider_1,
+      #contrast_slider_2 {
+        width: 100px;
+        vertical-align: middle;
       }
 
       #result > div.image_slider {
@@ -604,20 +930,11 @@
           margin: 0 auto;
         }
       }
-      @media screen and (min-height: 512px) {
-        #compare_container {
-          grid-template-rows: min(128px, max(20vh, 64px)) minmax(0, 1fr) auto;
-        }
-        #compare_container > .horizontal-image-list {
-          display: flex;
-        }
-      }
     </style>
 
     <script defer src="js/transform.js"></script>
     <script
       src="./deps/material-components-web.min.js"
-      integrity="sha384-8iww5N0HFABAFdwBAcqef8367heaZqV6cGdI2zjVr6ztCVbINoKlnoyYyCvkEtAt"
       defer
     ></script>
     <script defer src="deps/gifshot.js"></script>
@@ -625,6 +942,7 @@
     <script defer src="js/viz.js"></script>
     <script defer src="js/action.js"></script>
     <script defer src="js/compare.js"></script>
+    <script defer src="js/panes.js"></script>
     <script defer src="js/samples.js"></script>
   </head>
   <body class="mdc-typography">
@@ -896,6 +1214,58 @@
           </div>
         </div>
       </div>
+    </div>
+    <div
+      class="mdc-dialog"
+      aria-modal="true"
+      aria-labelledby="transform-help-title"
+      aria-describedby="transform-help-content"
+      id="transform_help_dialog"
+      data-mdc-auto-init="MDCDialog"
+    >
+      <div class="mdc-dialog__container">
+        <div class="mdc-dialog__surface">
+          <h2 class="mdc-dialog__title" id="transform-help-title">
+            Which transform mode should I use?
+          </h2>
+          <div class="mdc-dialog__content" id="transform-help-content">
+            <ul style="padding-left: 1.2em; margin: 0 0 1em 0">
+              <li>
+                <b>Affine</b> is best suited for two scans that are both
+                basically flat and square-on - it can correct shifting,
+                rotation, scaling, and stretching.
+              </li>
+              <li>
+                <b>Perspective</b> is best suited when a page was
+                photographed at an angle, or a book wasn't lying fully flat -
+                it corrects everything Affine does, plus perspective
+                distortion.
+              </li>
+              <li>
+                <b>Thin Plate Spline</b> is best suited for a page with
+                local warping or curvature (e.g. from the gutter of a bound
+                book) - it corrects everything Perspective does, plus
+                uneven, non-linear bending.
+              </li>
+            </ul>
+            <p>
+              Turning the images black and white and/or increasing the
+              contrast may deliver a better result.
+            </p>
+          </div>
+          <div class="mdc-dialog__actions">
+            <button
+              type="button"
+              class="mdc-button mdc-dialog__button"
+              data-mdc-dialog-action="close"
+            >
+              <div class="mdc-button__ripple"></div>
+              <span class="mdc-button__label">Got it!</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="mdc-dialog__scrim"></div>
     </div>
     <aside>
       <div class="mdc-dialog" data-mdc-auto-init="MDCDialog" id="how_it_works">
@@ -1392,21 +1762,65 @@
             class="mdc-image-list__item w-100 mdc-elevation--z4"
             data-index="0"
           >
-            <img
-              class="mdc-image-list__image"
-              src="images/logo/imcomp-logo-large-path.svg"
-            />
-            <span class="material-icons"> change_circle </span>
+            <div class="image_preview">
+              <img
+                class="mdc-image-list__image"
+                src="images/logo/imcomp-logo-large-path.svg"
+              />
+              <span class="material-icons"> change_circle </span>
+            </div>
+            <div class="image_adjust" onclick="event.stopPropagation()">
+              <label for="bw_toggle_checkbox_1" style="cursor: pointer">
+                <input type="checkbox" id="bw_toggle_checkbox_1" />
+                <span class="mdc-typography--caption mdc-theme--primary"
+                  >Black-and-white</span
+                >
+              </label>
+              <input
+                type="range"
+                id="contrast_slider_1"
+                min="100"
+                max="400"
+                value="100"
+              />
+              <span
+                id="contrast_label_1"
+                class="mdc-typography--caption mdc-theme--primary"
+                >Contrast</span
+              >
+            </div>
           </li>
           <li
             class="mdc-image-list__item w-100 mdc-elevation--z4"
             data-index="1"
           >
-            <img
-              class="mdc-image-list__image"
-              src="images/logo/imcomp-logo-large-path.svg"
-            />
-            <span class="material-icons"> change_circle </span>
+            <div class="image_preview">
+              <img
+                class="mdc-image-list__image"
+                src="images/logo/imcomp-logo-large-path.svg"
+              />
+              <span class="material-icons"> change_circle </span>
+            </div>
+            <div class="image_adjust" onclick="event.stopPropagation()">
+              <label for="bw_toggle_checkbox_2" style="cursor: pointer">
+                <input type="checkbox" id="bw_toggle_checkbox_2" />
+                <span class="mdc-typography--caption mdc-theme--primary"
+                  >Black-and-white</span
+                >
+              </label>
+              <input
+                type="range"
+                id="contrast_slider_2"
+                min="100"
+                max="400"
+                value="100"
+              />
+              <span
+                id="contrast_label_2"
+                class="mdc-typography--caption mdc-theme--primary"
+                >Contrast</span
+              >
+            </div>
           </li>
         </ul>
 
@@ -1427,151 +1841,30 @@
           </li>
         </ul>
         <div class="result_container">
-          <div id="result">
-            <div class="image_slider hide horizontal"></div>
-            <canvas> </canvas>
+          <div id="workspace" class="ws-three">
+            <div class="pane" id="pane_main">
+              <div class="pane__vp">
+                <div id="result" class="pane__content">
+                  <div class="image_slider hide horizontal"></div>
+                  <canvas> </canvas>
+                </div>
+              </div>
+            </div>
+            <div class="splitter splitter--v" id="split_v" title="Drag to resize"></div>
+            <div class="pane" id="pane_o1">
+              <div class="pane__vp">
+                <div class="pane__content"><canvas></canvas></div>
+              </div>
+            </div>
+            <div class="splitter splitter--h" id="split_h" title="Drag to resize"></div>
+            <div class="pane" id="pane_o2">
+              <div class="pane__vp">
+                <div class="pane__content"><canvas></canvas></div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div id="action">
-          <div id="toggle" class="mdc-tab-bar mdc-elevation--z4">
-            <div class="mdc-tab-scroller">
-              <div class="mdc-tab-scroller__scroll-area">
-                <div class="mdc-tab-scroller__scroll-content">
-                  <button class="mdc-tab" data-speed="1">
-                    <span class="mdc-tab__content">
-                      <span class="mdc-tab__text-label mdc-theme--primary"
-                        >SLOW</span
-                      >
-                    </span>
-                  </button>
-                  <button
-                    class="mdc-tab mdc-theme--primary-bg active"
-                    data-speed="2"
-                  >
-                    <span class="mdc-tab__content">
-                      <span class="mdc-tab__text-label mdc-theme--on-primary"
-                        >NORMAL</span
-                      >
-                    </span>
-                  </button>
-                  <button class="mdc-tab" data-speed="4">
-                    <span class="mdc-tab__content">
-                      <span class="mdc-tab__text-label mdc-theme--primary"
-                        >FAST</span
-                      >
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div id="slide" class="fr f-auto hide">
-            <div class="mdc-form-field" data-mdc-auto-init="MDCFormField">
-              <div
-                class="mdc-radio mdc-radio--touch"
-                data-mdc-auto-init="MDCRadio"
-              >
-                <input
-                  class="mdc-radio__native-control"
-                  type="radio"
-                  id="radio-horizontal"
-                  name="radio-slider"
-                  value="horizontal"
-                  checked
-                />
-                <div class="mdc-radio__background">
-                  <div class="mdc-radio__outer-circle"></div>
-                  <div class="mdc-radio__inner-circle"></div>
-                </div>
-                <div class="mdc-radio__ripple"></div>
-              </div>
-              <label for="radio-horizontal">Horizontal</label>
-            </div>
-            <div class="mdc-form-field" data-mdc-auto-init="MDCFormField">
-              <div
-                class="mdc-radio mdc-radio--touch"
-                data-mdc-auto-init="MDCRadio"
-              >
-                <input
-                  class="mdc-radio__native-control"
-                  type="radio"
-                  id="radio-vertical"
-                  name="radio-slider"
-                  value="vertical"
-                />
-                <div class="mdc-radio__background">
-                  <div class="mdc-radio__outer-circle"></div>
-                  <div class="mdc-radio__inner-circle"></div>
-                </div>
-                <div class="mdc-radio__ripple"></div>
-              </div>
-              <label for="radio-vertical">Vertical</label>
-            </div>
-          </div>
-          <div id="diff" class="hide">
-            <button
-              class="mdc-button mdc-button--touch mdc-button--icon-leading mdc-button--outlined"
-            >
-              <span
-                class="mdc-button__ripple"
-                data-mdc-auto-init="MDCRipple"
-              ></span>
-              <span class="mdc-button__touch"></span>
-              <i class="material-icons mdc-button__icon" aria-hidden="true"
-                >download</i
-              >
-              <span class="mdc-button__label">Download</span>
-            </button>
-          </div>
-          <div id="hover" class="hide fc f-center">
-            <span class="mdc-typography--subtitle1"
-              >Showing image: <span id="hover-image">1</span></span
-            >
-            <span
-              class="text-center mdc-typography--caption mdc-theme--text-hint-on-background"
-            >
-              <em
-                >Move finger / mouse over the result to toggle manually between
-                the images.</em
-              >
-            </span>
-          </div>
-          <div id="overlay" class="fr f-center hide">
-            <span
-              ><img
-                src="images/logo/image-compare-1.svg"
-                alt="1"
-                title="Image 1"
-            /></span>
-            <div class="mdc-slider" data-mdc-auto-init="MDCSlider">
-              <input
-                class="mdc-slider__input"
-                type="range"
-                min="0"
-                max="100"
-                value="50"
-                name="overlay"
-                aria-label="Image overlay slider"
-              />
-              <div class="mdc-slider__track">
-                <div class="mdc-slider__track--inactive"></div>
-                <div class="mdc-slider__track--active">
-                  <div class="mdc-slider__track--active_fill"></div>
-                </div>
-              </div>
-              <div class="mdc-slider__thumb">
-                <div class="mdc-slider__thumb-knob"></div>
-              </div>
-            </div>
-            <span
-              ><img
-                src="images/logo/image-compare-2.svg"
-                alt="2"
-                title="Image 2"
-            /></span>
-          </div>
-        </div>
         <button id="compare" class="mdc-button mdc-button--raised">
           <span
             class="mdc-button__ripple"
@@ -1763,13 +2056,13 @@
                   <span
                     id="select-label"
                     class="mdc-floating-label mdc-floating-label--float-above mdc-theme--on-primary mdc-typography--body1"
-                    >Visualisation</span
+                    >Visualization</span
                   >
                   <span class="mdc-select__selected-text-container">
                     <span
                       id="selected-text"
                       class="mdc-select__selected-text mdc-theme--on-primary mdc-typography--button"
-                      >Toggle</span
+                      >Difference</span
                     >
                   </span>
                   <span class="mdc-select__dropdown-icon">
@@ -1800,11 +2093,11 @@
                   <ul
                     class="mdc-deprecated-list"
                     role="listbox"
-                    aria-label="Visualisation picker listbox"
+                    aria-label="Visualization picker listbox"
                   >
                     <li
-                      class="mdc-deprecated-list-item"
-                      aria-selected="false"
+                      class="mdc-deprecated-list-item mdc-deprecated-list-item--selected"
+                      aria-selected="true"
                       data-value="diff"
                       role="option"
                     >
@@ -1813,32 +2106,6 @@
                         class="mdc-deprecated-list-item__text mdc-typography--body1"
                       >
                         Difference
-                      </span>
-                    </li>
-                    <li
-                      class="mdc-deprecated-list-item"
-                      aria-selected="false"
-                      data-value="hover"
-                      role="option"
-                    >
-                      <span class="mdc-deprecated-list-item__ripple"></span>
-                      <span
-                        class="mdc-deprecated-list-item__text mdc-typography--body1"
-                      >
-                        Hover
-                      </span>
-                    </li>
-                    <li
-                      class="mdc-deprecated-list-item mdc-deprecated-list-item"
-                      aria-selected="false"
-                      data-value="overlay"
-                      role="option"
-                    >
-                      <span class="mdc-deprecated-list-item__ripple"></span>
-                      <span
-                        class="mdc-deprecated-list-item__text mdc-typography--body1"
-                      >
-                        Overlay
                       </span>
                     </li>
                     <li
@@ -1855,8 +2122,8 @@
                       </span>
                     </li>
                     <li
-                      class="mdc-deprecated-list-item mdc-deprecated-list-item--selected"
-                      aria-selected="true"
+                      class="mdc-deprecated-list-item"
+                      aria-selected="false"
                       data-value="toggle"
                       role="option"
                     >
@@ -1867,11 +2134,192 @@
                         Toggle
                       </span>
                     </li>
+                    <li
+                      class="mdc-deprecated-list-item"
+                      aria-selected="false"
+                      data-value="topbottom"
+                      role="option"
+                    >
+                      <span class="mdc-deprecated-list-item__ripple"></span>
+                      <span
+                        class="mdc-deprecated-list-item__text mdc-typography--body1"
+                      >
+                        Top and bottom
+                      </span>
+                    </li>
+                    <li
+                      class="mdc-deprecated-list-item"
+                      aria-selected="false"
+                      data-value="leftright"
+                      role="option"
+                    >
+                      <span class="mdc-deprecated-list-item__ripple"></span>
+                      <span
+                        class="mdc-deprecated-list-item__text mdc-typography--body1"
+                      >
+                        Left and right
+                      </span>
+                    </li>
+                    <li
+                      class="mdc-deprecated-list-item"
+                      aria-selected="false"
+                      data-value="onlyimage1"
+                      role="option"
+                    >
+                      <span class="mdc-deprecated-list-item__ripple"></span>
+                      <span
+                        class="mdc-deprecated-list-item__text mdc-typography--body1"
+                      >
+                        Only image 1
+                      </span>
+                    </li>
+                    <li
+                      class="mdc-deprecated-list-item"
+                      aria-selected="false"
+                      data-value="onlyimage2"
+                      role="option"
+                    >
+                      <span class="mdc-deprecated-list-item__ripple"></span>
+                      <span
+                        class="mdc-deprecated-list-item__text mdc-typography--body1"
+                      >
+                        Only image 2
+                      </span>
+                    </li>
                   </ul>
                 </div>
               </div>
             </span>
           </div>
+          <button
+            id="transform_help_btn"
+            class="transform_help_btn"
+            type="button"
+            title="Which transform mode should I use?"
+          >
+            ?
+          </button>
+          <div id="action">
+            <div id="topbottom" class="hide"></div>
+            <div id="leftright" class="hide"></div>
+            <div id="toggle" class="hide mdc-tab-bar mdc-elevation--z4">
+              <div class="mdc-tab-scroller">
+                <div class="mdc-tab-scroller__scroll-area">
+                  <div class="mdc-tab-scroller__scroll-content">
+                    <button class="mdc-tab" data-speed="1">
+                      <span class="mdc-tab__content">
+                        <span class="mdc-tab__text-label mdc-theme--primary"
+                          >SLOW</span
+                        >
+                      </span>
+                    </button>
+                    <button
+                      class="mdc-tab mdc-theme--primary-bg active"
+                      data-speed="2"
+                    >
+                      <span class="mdc-tab__content">
+                        <span class="mdc-tab__text-label mdc-theme--on-primary"
+                          >NORMAL</span
+                        >
+                      </span>
+                    </button>
+                    <button class="mdc-tab" data-speed="4">
+                      <span class="mdc-tab__content">
+                        <span class="mdc-tab__text-label mdc-theme--primary"
+                          >FAST</span
+                        >
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="slide" class="fr f-auto hide">
+              <div class="mdc-form-field" data-mdc-auto-init="MDCFormField">
+                <div
+                  class="mdc-radio mdc-radio--touch"
+                  data-mdc-auto-init="MDCRadio"
+                >
+                  <input
+                    class="mdc-radio__native-control"
+                    type="radio"
+                    id="radio-horizontal"
+                    name="radio-slider"
+                    value="horizontal"
+                    checked
+                  />
+                  <div class="mdc-radio__background">
+                    <div class="mdc-radio__outer-circle"></div>
+                    <div class="mdc-radio__inner-circle"></div>
+                  </div>
+                  <div class="mdc-radio__ripple"></div>
+                </div>
+                <label for="radio-horizontal">Horizontal</label>
+              </div>
+              <div class="mdc-form-field" data-mdc-auto-init="MDCFormField">
+                <div
+                  class="mdc-radio mdc-radio--touch"
+                  data-mdc-auto-init="MDCRadio"
+                >
+                  <input
+                    class="mdc-radio__native-control"
+                    type="radio"
+                    id="radio-vertical"
+                    name="radio-slider"
+                    value="vertical"
+                  />
+                  <div class="mdc-radio__background">
+                    <div class="mdc-radio__outer-circle"></div>
+                    <div class="mdc-radio__inner-circle"></div>
+                  </div>
+                  <div class="mdc-radio__ripple"></div>
+                </div>
+                <label for="radio-vertical">Vertical</label>
+              </div>
+            </div>
+            <!-- The "Red = image 1 / Cyan = Image 2" note now lives in the
+                 "Superimposed" panel label itself (see panes.js) instead of
+                 here. This div is kept empty (rather than removed) because
+                 Action's generic show/hide logic expects every mode to have
+                 a matching element here - removing it would crash the app
+                 when switching to or from Difference mode. -->
+            <div id="diff" class="hide"></div>
+            <div id="onlyimage1" class="hide image_variant_switch">
+              <button type="button" class="image_variant_btn active" data-variant="adjusted">
+                User-adjusted
+              </button>
+              <button type="button" class="image_variant_btn" data-variant="original">
+                Original
+              </button>
+            </div>
+            <div id="onlyimage2" class="hide image_variant_switch">
+              <button type="button" class="image_variant_btn active" data-variant="adjusted">
+                User-adjusted
+              </button>
+              <button type="button" class="image_variant_btn" data-variant="original">
+                Original
+              </button>
+            </div>
+          </div>
+          <button
+            id="link_toggle"
+            class="mdc-tab mdc-tab--stacked hide"
+            title="When linked, zooming or scrolling in one panel moves the other two to the same spot"
+          >
+            <span class="mdc-tab__content">
+              <span
+                id="link_icon"
+                class="mdc-tab__icon material-icons mdc-typography--caption mdc-theme--on-primary"
+                aria-hidden="true"
+                >link</span
+              >
+              <span
+                id="link_label"
+                class="mdc-tab__text-label mdc-theme--on-primary mdc-typography--caption"
+                >Linked</span
+              >
+            </span>
+          </button>
 
           <button
             id="more"
@@ -1928,6 +2376,21 @@
                   >
                   <span class="mdc-deprecated-list-item__text"
                     >Export Toggle View</span
+                  >
+                </li>
+                <li
+                  class="mdc-deprecated-list-item mdc-deprecated-list-item--disabled"
+                  role="menuitem"
+                  data-name="export_diff_image"
+                >
+                  <span class="mdc-deprecated-list-item__ripple"></span>
+                  <span
+                    class="mdc-deprecated-list-item__graphic mdc-menu__selection-group-icon material-icons"
+                    aria-hidden="true"
+                    >image</span
+                  >
+                  <span class="mdc-deprecated-list-item__text"
+                    >Export Current View (e.g. Difference)</span
                   >
                 </li>
                 <li class="mdc-list-divider" role="separator"></li>
@@ -2099,6 +2562,56 @@
             compare.show_compare_screen();
           });
         });
+      });
+
+      // Step 2 settings, with a live preview on the two scans
+      window.addEventListener("load", () => {
+        // ---- Step 2: settings, with a live preview on the two scans ----
+        // BW_ENABLED_1/2 and CONTRAST_PERCENT_1/2 are declared with `let` at
+        // the top of viz.js; classic scripts share that scope. MAX_DIM is
+        // now a fixed `const` (always full resolution), so there's nothing
+        // to wire up for it any more.
+        const bw_checkbox_1 = document.getElementById("bw_toggle_checkbox_1");
+        const bw_checkbox_2 = document.getElementById("bw_toggle_checkbox_2");
+        const slider_1 = document.getElementById("contrast_slider_1");
+        const slider_2 = document.getElementById("contrast_slider_2");
+        const label_1 = document.getElementById("contrast_label_1");
+        const label_2 = document.getElementById("contrast_label_2");
+
+        const filter_for = (bwEnabled, contrast) => {
+          const parts = [];
+          if (bwEnabled) parts.push("grayscale(1)");
+          if (contrast !== 100) parts.push(`contrast(${contrast}%)`);
+          return parts.join(" ");
+        };
+        const apply_preview = () => {
+          const imgs = document.querySelectorAll(
+            "#compare_container > .vertical-image-list img"
+          );
+          if (imgs[0]) imgs[0].style.filter = filter_for(BW_ENABLED_1, CONTRAST_PERCENT_1);
+          if (imgs[1]) imgs[1].style.filter = filter_for(BW_ENABLED_2, CONTRAST_PERCENT_2);
+        };
+        const sync_settings = () => {
+          BW_ENABLED_1 = bw_checkbox_1.checked;
+          BW_ENABLED_2 = bw_checkbox_2.checked;
+          CONTRAST_PERCENT_1 = Number(slider_1.value);
+          CONTRAST_PERCENT_2 = Number(slider_2.value);
+          label_1.textContent =
+            CONTRAST_PERCENT_1 === 100 ? "Contrast 1" : `Contrast 1: ${CONTRAST_PERCENT_1}%`;
+          label_2.textContent =
+            CONTRAST_PERCENT_2 === 100 ? "Contrast 2" : `Contrast 2: ${CONTRAST_PERCENT_2}%`;
+          apply_preview();
+        };
+        bw_checkbox_1.onchange = sync_settings;
+        bw_checkbox_2.onchange = sync_settings;
+        slider_1.oninput = sync_settings;
+        slider_2.oninput = sync_settings;
+        sync_settings(); // also picks up boxes the browser restored after a reload
+
+        // "Which transform mode should I use?" help popup
+        document.getElementById("transform_help_btn").onclick = () => {
+          document.getElementById("transform_help_dialog").MDCDialog.open();
+        };
       });
 
       // register service worker

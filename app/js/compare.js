@@ -28,7 +28,7 @@ class Compare {
 
         this.visualisation_select = document.getElementById('visualisation_select');
         this.transform_select = document.getElementById('transform_select')
-        this.downscale_option = document.getElementById('skip_downscale_checkbox').closest('.mdc-tab');
+        this.link_option = document.getElementById('link_toggle');
         this.current_transform = 'affine';
 
         this.back_btn = document.getElementById('back');
@@ -158,7 +158,7 @@ class Compare {
         }
 
         this.transform_select.classList.remove('hide');
-        this.downscale_option.classList.remove('hide');
+        this.link_option.classList.add('hide');
 
         this.visualisation_select.classList.add('hide');
         this.visualisation_select.MDCSelect.setValue('diff');
@@ -175,7 +175,7 @@ class Compare {
         this.visualisation_select.classList.remove('hide');
 
         this.transform_select.classList.add('hide');
-        this.downscale_option.classList.add('hide');
+        this.link_option.classList.remove('hide');
 
         this.action_bar.show();
         this.cc.scrollIntoView({behavior: 'smooth', inline: 'end'})
